@@ -2,7 +2,7 @@
 
 ### Open-source RF Pentesting Device using WEMOS D1 Mini ESP8266 & a CC1101 Module
 
-### Designed to also work with a flipper ### Make sure you flash the 
+### Designed to also work with a flipper 
 
 ### Make sure to flash the cc11001tool-esp8266.ino if using D1 Wemos Mini
 
