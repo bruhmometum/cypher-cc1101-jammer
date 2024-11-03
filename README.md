@@ -8,6 +8,12 @@
 
 ### Order my PCB from PCBWay & get a $10 coupon ^_^ : https://pcbway.com/g/87Pi52
 
+<img src="device_img/cypher_c11011.JPG" alt="Wifi and Bluetooth jammer made with an esp32 and nrf24l01+pa+lna modules." width="400" height="600">
+<img src="device_img/cypher_c11012.JPG" alt="Wifi and Bluetooth jammer made with an esp32 and nrf24l01+pa+lna modules." width="400" height="600">
+<img src="device_img/cypher_c11013.JPG" alt="Wifi and Bluetooth jammer made with an esp32 and nrf24l01+pa+lna modules." width="400" height="600">
+<img src="device_img/cypher_c11014.JPG" alt="Wifi and Bluetooth jammer made with an esp32 and nrf24l01+pa+lna modules." width="400" height="600">
+<img src="device_img/cypher_c11015.JPG" alt="Wifi and Bluetooth jammer made with an esp32 and nrf24l01+pa+lna modules." width="400" height="600">
+
 
 # cc1101-tool
 RF tool based on CC1101 module and Arduino Pro Micro 8VMHz/3.3V. Allows using CLI to control CC1101 board over USB interface. Putty or any other serial terminal can be used. It has similar functionality to YardStick One but is cheaper and does not need specialized software. Allows for RF jamming and replay attacks as well. It has RAW  recording/replaying function which works exactly the same as in the Flipper Zero. Additional function is Radio Chat communicator
