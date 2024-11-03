@@ -1,3 +1,12 @@
+# Cypher CC1101 Jammer
+
+### Open-source RF Pentesting Device using WEMOS D1 Mini ESP8266 & a CC1101 Module
+
+### Designed to also work with a flipper zero!
+
+### Order my PCB from PCBWay & get a $10 coupon ^_^ : https://pcbway.com/g/87Pi52
+
+
 # cc1101-tool
 RF tool based on CC1101 module and Arduino Pro Micro 8VMHz/3.3V. Allows using CLI to control CC1101 board over USB interface. Putty or any other serial terminal can be used. It has similar functionality to YardStick One but is cheaper and does not need specialized software. Allows for RF jamming and replay attacks as well. It has RAW  recording/replaying function which works exactly the same as in the Flipper Zero. Additional function is Radio Chat communicator
 
