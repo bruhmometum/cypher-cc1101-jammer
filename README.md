@@ -1,4 +1,4 @@
-# Cypher CC1101 Jammer
+# Cypher CC1101 Jammer PCB files & schematics.
 
 ### Open-source RF Pentesting Device using WEMOS D1 Mini ESP8266 & a CC1101 Module
 
