@@ -30,7 +30,7 @@ Following commands are available :
     
     setdeviation <deviation>     // Set the Frequency deviation in kHz. Value from 1.58 to 380.85. Default is 47.60 kHz.
     
-    setchannel <channel>         // Set the Channelnumber from 0 to 255. Default is cahnnel 0.
+    setchannel <channel>         // Set the Channelnumber from 0 to 255. Default is channel 0.
     
     setchsp <spacing>            // The channel spacing is multiplied by the channel number CHAN and added to the base frequency in kHz. Value from 25.39 to 405.45. Default is 199.95 kHz. 
     
