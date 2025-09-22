@@ -4,29 +4,44 @@
 // on selected radio channel, modulation, ..
 //
 // (C) Adam Loboda '2023 , adam.loboda@wp.pl
+//  
+// based on great SmartRC library by Little_S@tan
+// Please download ZIP from 
+// https://github.com/LSatan/SmartRC-CC1101-Driver-Lib
+// and attach it as ZIP library for Arduino
+//
+// Also uses Arduino Command Line interpreter by Edgar Bonet
+// from https://gist.github.com/edgar-bonet/607b387260388be77e96
+//
+// This code will ONLY work with ESP32 board
+//
 
 #include <ELECHOUSE_CC1101_SRC_DRV.h>
-
-// ESP32 compatible libraries
 #include <EEPROM.h>
-#include <Arduino.h>
-#include "esp_system.h"
-#include "esp_task_wdt.h"
 
 #define CCBUFFERSIZE 64
 #define RECORDINGBUFFERSIZE 4096   // Buffer for recording the frames
-#define EPROMSIZE 4096              // Size of EEPROM in your Arduino chip. For  ESP32 size is 4096
+#define EPROMSIZE 512              // Size of EEPROM in your Arduino chip. For ESP32 it is Flash simulated so very slow
 #define BUF_LENGTH 128             // Buffer for the incoming command.
 
-// defining PINs set for ESP32-WROOM module
-byte sck  = 18;  // GPIO 18
-byte miso = 19;  // GPIO 19
-byte mosi = 23;  // GPIO 23
-byte ss   = 5;   // GPIO 5 (CS)
-int gdo0  = 26;   // GPIO 26
-int gdo2  = 34;   // GPIO 34
+// defining PINs set for ESP32 module
+// Example for XIAO ESP32 C3
+/* byte sck = 8;
+byte miso = 4;
+byte mosi = 10;
+byte ss = 20;
+int gdo0 = 21;
+int gdo2 = 7; */
 
-#define ESP_wdtFeed() esp_task_wdt_reset()
+// defining PINs set for ESP32 WROOM module
+
+byte sck = 18;     //  GPIO 18
+byte miso = 19;    //  GPIO 19
+byte mosi = 23;    //  GPIO 23
+byte ss = 5;       //  GPIO 5
+int gdo0 = 2;      //  GPIO 2
+int gdo2 = 4;      //  GPIO 4
+
 
 // position in big recording buffer
 int bigrecordingbufferpos = 0; 
@@ -152,8 +167,8 @@ static void exec(char *cmdline)
         
     char *command = strsep(&cmdline, " ");
     int setting, setting2, len;
+    uint16_t brute, poweroftwo;
     byte j, k;
-    uint16_t brute, poweroftwo;   
     float settingf1;
     float settingf2;
     // variables for frequency scanner
@@ -177,7 +192,6 @@ static void exec(char *cmdline)
           "setpa <power value> : Set RF transmission power. The following settings are possible depending on the frequency band.  (-30  -20  -15  -10  -6    0    5    7    10   11   12) Default is max!\r\n\r\n"
           "setsyncmode  <sync mode> : Combined sync-word qualifier mode. 0 = No preamble/sync. 1 = 16 sync word bits detected. 2 = 16/16 sync word bits detected. 3 = 30/32 sync word bits detected. 4 = No preamble/sync, carrier-sense above threshold. 5 = 15/16 + carrier-sense above threshold. 6 = 16/16 + carrier-sense above threshold. 7 = 30/32 + carrier-sense above threshold.\r\n"
          ));
-          yield();       
         Serial.println(F(
           "setsyncword <decimal LOW, decimal HIGH> : Set sync word. Must be the same for the transmitter and receiver. (Syncword high, Syncword low) Default is 211,145\r\n\r\n"
           "setadrchk <address chk> : Controls address check configuration of received packages. 0 = No address check. 1 = Address check, no broadcast. 2 = Address check and 0 (0x00) broadcast. 3 = Address check and 0 (0x00) and 255 (0xFF) broadcast.\r\n\r\n"
@@ -189,7 +203,6 @@ static void exec(char *cmdline)
           "setcrc <mode> : Switches on/of CRC calculation and check. 1 = CRC calculation in TX and CRC check in RX enabled. 0 = CRC disabled for TX and RX.\r\n\r\n"
           "setcrcaf <mode> : Enable automatic flush of RX FIFO when CRC is not OK. This requires that only one packet is in the RXIFIFO and that packet length is limited to the RX FIFO size.\r\n"
          ));
-          yield();
         Serial.println(F(
           "setdcfilteroff <mode> : Disable digital DC blocking filter before demodulator. Only for data rates ≤ 250 kBaud The recommended IF frequency changes when the DC blocking is disabled. 1 = Disable (current optimized). 0 = Enable (better sensitivity).\r\n\r\n"
           "setmanchester <mode> : Enables Manchester encoding/decoding. 0 = Disable. 1 = Enable.\r\n\r\n"
@@ -201,12 +214,11 @@ static void exec(char *cmdline)
           "scan <start> <stop> : Scan frequency range for the highest signal.\r\n\r\n"         
           "chat :  Enable chat mode between many devices. No exit available, disconnect device to quit\r\n"
          ));
-          yield();
-         Serial.println(F(
+        Serial.println(F(
           "rx : Sniffer. Enable or disable printing of received RF packets on serial terminal.\r\n\r\n"
           "tx <hex-vals> : Send packet of max 60 bytes <hex values> over RF\r\n\r\n"
           "jam : Enable or disable continous jamming on selected band.\r\n\r\n"
-          "brute <microseconds> <number-of-bits> : Brute force garage gate with <nb-of-bits> keyword where symbol time is <usec>.\r\n\r\n"
+          "brute <microseconds> <number-of-bits> : Brute force garage gate with <nb-of-bits> keyword where symbol time is <usec>.\r\n\r\n"            
           "rec : Enable or disable recording frames in the buffer.\r\n\r\n"
           "add <hex-vals> : Manually add single frame payload (max 64 hex values) to the buffer so it can be replayed\r\n\r\n"
           "show : Show content of recording buffer\r\n\r\n"
@@ -215,7 +227,6 @@ static void exec(char *cmdline)
           "rxraw <microseconds> : Sniffs radio by sampling with <microsecond> interval and prints received bytes in hex.\r\n\r\n"
           "recraw <microseconds> : Recording RAW RF data with <microsecond> sampling interval.\r\n"
             ));
-          yield();
         Serial.println(F(
           "addraw <hex-vals> : Manually add chunks (max 60 hex values) to the buffer so they can be further replayed.\r\n\r\n"        
           "showraw : Showing content of recording buffer in RAW format.\r\n\r\n"
@@ -226,8 +237,7 @@ static void exec(char *cmdline)
           "echo <mode> : Enable or disable Echo on serial terminal. 1 = enabled, 0 = disabled\r\n\r\n"
           "x : Stops jamming/receiving/recording packets.\r\n\r\n"
           "init : Restarts CC1101 board with default parameters\r\n\r\n"
-            ));
-          yield();
+         ));
 
     // Handling SETMODULATION command 
     } else if (strcmp_P(command, PSTR("setmodulation")) == 0) {
@@ -240,7 +250,6 @@ static void exec(char *cmdline)
         else if (setting == 3) { Serial.print(F("4-FSK")); }
         else if (setting == 4) { Serial.print(F("MSK")); };  
         Serial.print(F(" \r\n"));
-        yield();
 
     // Handling SETMHZ command 
     } else if (strcmp_P(command, PSTR("setmhz")) == 0) {
@@ -249,7 +258,6 @@ static void exec(char *cmdline)
         Serial.print(F("\r\nFrequency: "));
         Serial.print(settingf1);
         Serial.print(F(" MHz\r\n"));
-        yield();
         
     // Handling SETDEVIATION command 
     } else if (strcmp_P(command, PSTR("setdeviation")) == 0) {
@@ -258,7 +266,6 @@ static void exec(char *cmdline)
         Serial.print(F("\r\nDeviation: "));
         Serial.print(settingf1);
         Serial.print(F(" KHz\r\n"));        
-        yield();
 
     // Handling SETCHANNEL command       
     } else if (strcmp_P(command, PSTR("setchannel")) == 0) {
@@ -267,7 +274,6 @@ static void exec(char *cmdline)
         Serial.print(F("\r\nChannel:"));
         Serial.print(setting);
         Serial.print(F("\r\n"));        
-        yield();
 
     // Handling SETCHSP command 
     } else if (strcmp_P(command, PSTR("setchsp")) == 0) {
@@ -276,7 +282,6 @@ static void exec(char *cmdline)
         Serial.print(F("\r\nChann spacing: "));
         Serial.print(settingf1);
         Serial.print(F(" kHz\r\n"));  
-        yield();
 
     // Handling SETRXBW command         
     } else if (strcmp_P(command, PSTR("setrxbw")) == 0) {
@@ -285,7 +290,6 @@ static void exec(char *cmdline)
         Serial.print(F("\r\nRX bandwidth: "));
         Serial.print(settingf1);
         Serial.print(F(" kHz \r\n"));  
-        yield();
 
     // Handling SETDRATE command         
     } else if (strcmp_P(command, PSTR("setdrate")) == 0) {
@@ -294,7 +298,6 @@ static void exec(char *cmdline)
         Serial.print(F("\r\nDatarate: "));
         Serial.print(settingf1);
         Serial.print(F(" kbaud\r\n"));  
-        yield();
 
     // Handling SETPA command         
     } else if (strcmp_P(command, PSTR("setpa")) == 0) {
@@ -303,7 +306,6 @@ static void exec(char *cmdline)
         Serial.print(F("\r\nTX PWR: "));
         Serial.print(setting);
         Serial.print(F(" dBm\r\n"));  
-        yield();
         
     // Handling SETSYNCMODE command         
     } else if (strcmp_P(command, PSTR("setsyncmode")) == 0) {
@@ -319,7 +321,6 @@ static void exec(char *cmdline)
         else if (setting == 6) { Serial.print(F("16/16 + carrier-sense")); }
         else if (setting == 7) { Serial.print(F("30/32 + carrier-sense")); };
         Serial.print(F("\r\n"));  
-        yield();
         
     // Handling SETSYNCWORD command         
     } else if (strcmp_P(command, PSTR("setsyncword")) == 0) {
@@ -332,7 +333,7 @@ static void exec(char *cmdline)
         Serial.print(F("\r\nlow = "));
         Serial.print(setting2);
         Serial.print(F("\r\n"));  
-        yield();
+
     
     // Handling SETADRCHK command         
     } else if (strcmp_P(command, PSTR("setadrchk")) == 0) {
@@ -344,7 +345,6 @@ static void exec(char *cmdline)
         else if (setting == 2) { Serial.print(F("Adr chk and 0 bcast")); }
         else if (setting == 3) { Serial.print(F("Adr chk and 0 and FF bcast")); };
         Serial.print(F("\r\n"));  
-        yield();
         
     // Handling SETADDR command         
     } else if (strcmp_P(command, PSTR("setaddr")) == 0) {
@@ -353,7 +353,6 @@ static void exec(char *cmdline)
         Serial.print(F("\r\nAddress: "));
         Serial.print(setting);
         Serial.print(F("\r\n"));  
-        yield();
 
     // Handling SETWHITEDATA command         
     } else if (strcmp_P(command, PSTR("setwhitedata")) == 0) {
@@ -363,7 +362,6 @@ static void exec(char *cmdline)
         if (setting == 0) { Serial.print(F("OFF")); }
         else if (setting == 1) { Serial.print(F("ON")); }
         Serial.print(F("\r\n"));  
-        yield();
         
     // Handling SETPKTFORMAT command         
     } else if (strcmp_P(command, PSTR("setpktformat")) == 0) {
@@ -375,7 +373,6 @@ static void exec(char *cmdline)
         else if (setting == 2) { Serial.print(F("Random TX mode")); }
         else if (setting == 3) { Serial.print(F("Asynchronous serial mode")); };
         Serial.print(F("\r\n"));  
-        yield();
   
     // Handling SETLENGTHCONFIG command         
     } else if (strcmp_P(command, PSTR("setlengthconfig")) == 0) {
@@ -395,7 +392,6 @@ static void exec(char *cmdline)
         Serial.print(F("\r\nPkt length: "));
         Serial.print(setting);
         Serial.print(F(" bytes\r\n"));  
-        yield();
         
     // Handling SETCRC command         
     } else if (strcmp_P(command, PSTR("setcrc")) == 0) {
@@ -405,7 +401,6 @@ static void exec(char *cmdline)
         if (setting == 0) { Serial.print(F("Disabled")); }
         else if (setting == 1) { Serial.print(F("Enabled")); };
         Serial.print(F("\r\n")); 
-        yield();
         
     // Handling SETCRCAF command         
     } else if (strcmp_P(command, PSTR("setcrcaf")) == 0) {
@@ -424,7 +419,6 @@ static void exec(char *cmdline)
         if (setting == 0) { Serial.print(F("Enabled")); }
         else if (setting == 1) { Serial.print(F("Disabled")); };
         Serial.print(F("\r\n")); 
-        yield();
 
     // Handling SETMANCHESTER command         
      } else if (strcmp_P(command, PSTR("setmanchester")) == 0) {
@@ -434,7 +428,6 @@ static void exec(char *cmdline)
         if (setting == 0) { Serial.print(F("Disabled")); }
         else if (setting == 1) { Serial.print(F("Enabled")); };
         Serial.print(F("\r\n")); 
-        yield();
 
     // Handling SETFEC command         
      } else if (strcmp_P(command, PSTR("setfec")) == 0) {
@@ -444,7 +437,6 @@ static void exec(char *cmdline)
         if (setting == 0) { Serial.print(F("Disabled")); }
         else if (setting == 1) { Serial.print(F("Enabled")); };
         Serial.print(F("\r\n")); 
-        yield();
         
     // Handling SETPRE command         
      } else if (strcmp_P(command, PSTR("setpre")) == 0) {
@@ -454,7 +446,6 @@ static void exec(char *cmdline)
         Serial.print(setting);
         Serial.print(F(" means 0 = 2 bytes, 1 = 3b, 2 = 4b, 3 = 6b, 4 = 8b, 5 = 12b, 6 = 16b, 7 = 24 bytes\r\n")); 
         Serial.print(F("\r\n")); 
-        yield();
 
   
     // Handling SETPQT command         
@@ -464,7 +455,6 @@ static void exec(char *cmdline)
         Serial.print(F("\r\nPQT: "));
         Serial.print(setting);
         Serial.print(F("\r\n")); 
-        yield();
 
     // Handling SETAPPENDSTATUS command         
        } else if (strcmp_P(command, PSTR("setappendstatus")) == 0) {
@@ -474,7 +464,6 @@ static void exec(char *cmdline)
         if (setting == 0) { Serial.print(F("Enabled")); }
         else if (setting == 1) { Serial.print(F("Disabled")); };
         Serial.print(F("\r\n")); 
-        yield();
 
     // Handling GETRSSI command         
       } else if (strcmp_P(command, PSTR("getrssi")) == 0) {
@@ -485,7 +474,6 @@ static void exec(char *cmdline)
         Serial.print(F(" LQI: "));
         Serial.println(ELECHOUSE_cc1101.getLqi());        
         Serial.print(F("\r\n")); 
-        yield();
 
 
     // Handling SCAN command - frequency scanner by Little S@tan !
@@ -506,11 +494,6 @@ static void exec(char *cmdline)
         mark_rssi=-100;   
         while (!Serial.available())        
           {
-            // feed the watchdog
-            esp_task_wdt_reset();
-
-            yield();
-
             ELECHOUSE_cc1101.setMHZ(freq);
             rssi = ELECHOUSE_cc1101.getRssi();
             if (rssi>-75)
@@ -566,11 +549,9 @@ static void exec(char *cmdline)
             EEPROM.write(setting, bigrecordingbuffer[setting] );
            };
         // following command is required for ESP32
-        EEPROM.commit();   
+        EEPROM.commit();      
         // print confirmation
         Serial.print(F("\r\nSaving complete.\r\n\r\n"));
-        yield();
-        
                  
     // handling LOAD command
     } else if (strcmp_P(command, PSTR("load")) == 0) {     
@@ -587,7 +568,6 @@ static void exec(char *cmdline)
             bigrecordingbuffer[setting] = EEPROM.read(setting);
            }
         Serial.print(F("\r\nLoading complete. Enter 'show' or 'showraw' to see the buffer content.\r\n\r\n"));
-        yield();
                   
 
 
@@ -605,7 +585,6 @@ static void exec(char *cmdline)
                  recordingmode = 0;
                };
         Serial.print(F("\r\n")); 
-        yield();
  
 
     // Handling CHAT command         
@@ -618,7 +597,6 @@ static void exec(char *cmdline)
              receivingmode = 0;
              recordingmode = 0;
            };
-        yield();
  
 
     // Handling JAM command         
@@ -634,8 +612,7 @@ static void exec(char *cmdline)
                  jammingmode = 1;
                  receivingmode = 0; };
         Serial.print(F("\r\n")); 
-        yield();
-    
+
     // handling BRUTE command
     } else if (strcmp_P(command, PSTR("brute")) == 0) {
       
@@ -645,7 +622,7 @@ static void exec(char *cmdline)
         setting2 = atoi(cmdline);
         // calculate power of 2 upon setting
         poweroftwo = 1 << setting2;
-               
+                
         if (setting>0)
         {        
         // setup async mode on CC1101 and go into TX mode
@@ -657,7 +634,7 @@ static void exec(char *cmdline)
         //start playing RF with setting GDO0 bit state with bitbanging
         Serial.print(F("\r\nStarting Brute Forcing press any key to stop...\r\n"));
         pinMode(gdo0, OUTPUT);
-
+     
         for (brute = 0; brute < poweroftwo ; brute++)  
            { 
            for(int k = 0; k <  5; k++)  // sending 5 times each code
@@ -667,28 +644,20 @@ static void exec(char *cmdline)
                  digitalWrite(gdo0, bitRead(brute, j)); // Set GDO0 according to actual brute force value
                  delayMicroseconds(setting);            // delay for selected sampling interval
                }; // end of J loop
-               // watchdog
-               yield(); 
-               // feed the watchdog in ESP32
-               esp_task_wdt_reset();
-                    
              };  // end of K loop
              // checking if key pressed
              if (Serial.available()) break;
-           };           
-
+           };
         Serial.print(F("\r\nBrute forcing complete.\r\n\r\n"));
-        
+            
         // setting normal pkt format again
         ELECHOUSE_cc1101.setCCMode(1); 
         ELECHOUSE_cc1101.setPktFormat(0);
         ELECHOUSE_cc1101.SetTx();
         // pinMode(gdo0pin, INPUT);
-        } // end of IF
-        
+        } // end of IF        
         else { Serial.print(F("Wrong parameters.\r\n")); };
-
-  
+         
 
     // Handling TX command         
        } else if (strcmp_P(command, PSTR("tx")) == 0) {
@@ -707,7 +676,6 @@ static void exec(char *cmdline)
                 Serial.print((char *)textbuffer);
                 Serial.print(F("\r\n")); }
          else { Serial.print(F("Wrong parameters.\r\n")); };
-        yield();
 
 
 
@@ -722,6 +690,7 @@ static void exec(char *cmdline)
         ELECHOUSE_cc1101.setPktFormat(3);
         ELECHOUSE_cc1101.SetRx();
 
+
         //start recording to the buffer with bitbanging of GDO0 pin state
         Serial.print(F("\r\nWaiting for radio signal to start RAW recording...\r\n"));
         pinMode(gdo0, INPUT);
@@ -729,25 +698,16 @@ static void exec(char *cmdline)
         // this is only for ESP32 boards because they are getting some noise on the beginning
         setting2 = digitalRead(gdo0);
         delayMicroseconds(1000);  
-            
+
+
         // waiting for some data first or serial port signal
-        // while (!Serial.available() ||  (digitalRead(gdo0) == LOW) ); 
-        // feed the watchdog while waiting for the RF signal    
-        while ( digitalRead(gdo0) == LOW ) 
-                {  yield(); 
-                   // feed the watchdog in ESP32
-                   esp_task_wdt_reset();
-                  
-                };
-                   
-            
+        //while (!Serial.available() ||  (digitalRead(gdo0) == LOW) ); 
+        while ( digitalRead(gdo0) == LOW ); 
+
+        
         //start recording to the buffer with bitbanging of GDO0 pin state
         Serial.print(F("\r\nStarting RAW recording to the buffer...\r\n"));
-        pinMode(gdo0, INPUT);
 
-        // temporarly disable WDT for the time of recording
-        // ESP.wdtDisable();
-        // start recording RF signal        
         for (int i=0; i<RECORDINGBUFFERSIZE ; i++)  
            { 
              byte receivedbyte = 0;
@@ -758,21 +718,12 @@ static void exec(char *cmdline)
                }; 
                  // store the output into recording buffer
              bigrecordingbuffer[i] = receivedbyte;
-             // feed the watchdog in ESP32
-             esp_task_wdt_reset();
-  
            }
-        // enable WDT 
-        // ESP.wdtEnable(5000);
-        
         Serial.print(F("\r\nRecording RAW data complete.\r\n\r\n"));
         // setting normal pkt format again
         ELECHOUSE_cc1101.setCCMode(1); 
         ELECHOUSE_cc1101.setPktFormat(0);
         ELECHOUSE_cc1101.SetRx();
-        // feed the watchdog
-        esp_task_wdt_reset();
-          
         }
         else { Serial.print(F("Wrong parameters.\r\n")); };
 
@@ -788,10 +739,10 @@ static void exec(char *cmdline)
         ELECHOUSE_cc1101.SetRx();
         //start recording to the buffer with bitbanging of GDO0 pin state
         Serial.print(F("\r\nSniffer enabled...\r\n"));
-        pinMode(gdo0, INPUT);      
+        pinMode(gdo0, INPUT);
 
-        // temporarly disable WDT for the time of recording
-        // ESP.wdtDisable();       
+        
+        
        // Any received char over Serial port stops printing  RF received bytes
         while (!Serial.available()) 
            {  
@@ -807,28 +758,15 @@ static void exec(char *cmdline)
                     }; 
                     // store the output into recording buffer
                     bigrecordingbuffer[i] = receivedbyte;
-                    // feed the watchdog
-                    esp_task_wdt_reset();
-
-                  }; 
-             // enable WDT 
-             // ESP.wdtEnable(5000);        
-             // feed the watchdog
-             esp_task_wdt_reset();
-        
-                  
+                }; 
              // when buffer full print the ouptput to serial port
              for (int i = 0; i < RECORDINGBUFFERSIZE ; i = i + 32)  
                     { 
                        asciitohex(&bigrecordingbuffer[i], textbuffer,  32);
                        Serial.print((char *)textbuffer);
-                       // feed the watchdog
-                       esp_task_wdt_reset();
-
-
                     };
                     
- 
+            
            }; // end of While loop
            
         Serial.print(F("\r\nStopping the sniffer.\n\r\n"));
@@ -856,9 +794,7 @@ static void exec(char *cmdline)
         Serial.print(F("\r\nReplaying RAW data from the buffer...\r\n"));
         pinMode(gdo0, OUTPUT);
 
-        // temporarly disable WDT for the time of recording
-        // ESP.wdtDisable();
-        // start RF replay
+        
         for (int i=1; i<RECORDINGBUFFERSIZE ; i++)  
            { 
              byte receivedbyte = bigrecordingbuffer[i];
@@ -867,23 +803,15 @@ static void exec(char *cmdline)
                  digitalWrite(gdo0, bitRead(receivedbyte, j)); // Set GDO0 according to recorded byte
                  delayMicroseconds(setting);                      // delay for selected sampling interval
                }; 
-              // feed the watchdog
-              esp_task_wdt_reset();
+           }
 
-           };
-        // Enable WDT 
-        // ESP.wdtEnable(5000);
-           
+        
         Serial.print(F("\r\nReplaying RAW data complete.\r\n\r\n"));
         // setting normal pkt format again
         ELECHOUSE_cc1101.setCCMode(1); 
         ELECHOUSE_cc1101.setPktFormat(0);
         ELECHOUSE_cc1101.SetTx();
         // pinMode(gdo0pin, INPUT);
-        // feed the watchdog
-        esp_task_wdt_reset();
-        
-  
         }
         else { Serial.print(F("Wrong parameters.\r\n")); };
 
@@ -895,16 +823,8 @@ static void exec(char *cmdline)
            { 
                     asciitohex(&bigrecordingbuffer[i], textbuffer,  32);
                     Serial.print((char *)textbuffer);
-                    // feed the watchdog
-                    esp_task_wdt_reset();
-
-                 
-           };
+           }
        Serial.print(F("\r\n\r\n"));
-       // feed the watchdog
-       esp_task_wdt_reset();
-
-
 
 
     // handling SHOWBIT command
@@ -987,13 +907,10 @@ static void exec(char *cmdline)
                               }; // end of switch
                               
                         }; // end of for
-              // feed the watchdog
-              esp_task_wdt_reset();
-
  
-   
               } // end of for
               Serial.print(F("\r\n\r\n"));
+
 
 
     // Handling ADDRAW command         
@@ -1021,7 +938,8 @@ static void exec(char *cmdline)
         }  
         else { Serial.print(F("Wrong parameters.\r\n")); };
 
-        
+
+
     // Handling REC command         
     } else if (strcmp_P(command, PSTR("rec")) == 0) {
         Serial.print(F("\r\nRecording mode set to "));
@@ -1044,7 +962,7 @@ static void exec(char *cmdline)
                // start counting frames in the buffer
                framesinbigrecordingbuffer = 0;
                };
-        Serial.print(F("\r\n"));    
+        Serial.print(F("\r\n")); 
  
 
     // Handling PLAY command         
@@ -1076,11 +994,6 @@ static void exec(char *cmdline)
                   if ( bigrecordingbufferpos > RECORDINGBUFFERSIZE) break;
                  // 
                };
-               // feed the watchdog
-               esp_task_wdt_reset();
-
-   
-              
              }; // end of IF framesinrecordingbuffer  
         
           // rewind buffer position
@@ -1120,8 +1033,9 @@ static void exec(char *cmdline)
                      Serial.print(F("\r\nBuffer is full. The frame does not fit.\r\n "));
                    };
         }  
-        else { Serial.print(F("Wrong parameters.\r\n")); };   
-       
+        else { Serial.print(F("Wrong parameters.\r\n")); };
+
+
 
     // Handling SHOW command         
        } else if (strcmp_P(command, PSTR("show")) == 0) {
@@ -1151,9 +1065,6 @@ static void exec(char *cmdline)
                     // increase position to the buffer and check exception
                     bigrecordingbufferpos = bigrecordingbufferpos + 1 + len;
                     if ( bigrecordingbufferpos > RECORDINGBUFFERSIZE) break;
-                    // feed the watchdog
-                    esp_task_wdt_reset();
-
                  // 
                };
           // rewind buffer position
@@ -1161,7 +1072,6 @@ static void exec(char *cmdline)
           Serial.print(F("\r\n")); 
         }
          else { Serial.print(F("Wrong parameters.\r\n")); };
-    
 
 
     // Handling FLUSH command         
@@ -1172,7 +1082,6 @@ static void exec(char *cmdline)
         bigrecordingbufferpos = 0;
         framesinbigrecordingbuffer = 0;
         Serial.print(F("\r\nRecording buffer cleared.\r\n"));
-     
           
        
     // Handling ECHO command         
@@ -1186,7 +1095,6 @@ static void exec(char *cmdline)
         jammingmode = 0;
         recordingmode = 0;
         Serial.print(F("\r\n"));
-    
 
     // Handling INIT command         
     // command 'init' initializes board with default settings
@@ -1199,7 +1107,6 @@ static void exec(char *cmdline)
     } else {
         Serial.print(F("Error: Unknown command: "));
         Serial.println(command);
- 
         //  debug only
         // asciitohex(command, (byte *)textbuffer,  strlen(command));
         // Serial.print(F("\r\n"));
@@ -1214,13 +1121,13 @@ void setup() {
      // initialize USB Serial Port CDC
      Serial.begin(115200);
 
+    //Init EEPROM - for ESP32 based boards only
+     EEPROM.begin(EPROMSIZE);     
+
      Serial.println(F("CC1101 terminal tool connected, use 'help' for list of commands...\n\r"));
      Serial.println(F("(C) Adam Loboda 2023\n\r  "));
 
      Serial.println();  // print CRLF
-
-    //Init EEPROM - for ESP32 based boards only
-  EEPROM.begin(4096);
 
     
      // initialize CC1101 module with preffered parameters
@@ -1231,19 +1138,9 @@ void setup() {
       } else {
       Serial.println(F("cc1101 connection error! check the wiring.\n\r"));
       };
-    
+
       // setup variables
      bigrecordingbufferpos = 0;
-
-     // Enable software watchdog in ESP32 chip with 3 second fuse in case something goes wrong...
- esp_task_wdt_config_t wdt_config = {
-    .timeout_ms = 5000,   // 5s
-    .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, // all cores
-    .trigger_panic = true
-};
-esp_task_wdt_init(&wdt_config);
-esp_task_wdt_add(NULL);  // add current task (loop task)
-
 }
 
 
@@ -1252,15 +1149,10 @@ void loop() {
   // index for serial port characters
   int i = 0;
 
-   // feed the watchdog in ESP32
-   esp_task_wdt_reset();
- 
-
     /* Process incoming commands. */
     while (Serial.available()) {
         static char buffer[BUF_LENGTH];
         static int length = 0;
-
 
     // handling CHAT MODE     
     if (chatmode == 1) 
@@ -1272,13 +1164,12 @@ void loop() {
             // something was received over serial port put it into radio sending buffer
             while (Serial.available() and (i<(CCBUFFERSIZE-1)) ) 
              {
-
               // read single character from Serial port         
               ccsendingbuffer[i] = Serial.read();
 
               // also put it as ECHO back to serial port
               Serial.write(ccsendingbuffer[i]);
-
+               
               // if CR was received add also LF character and display it on Serial port
               if (ccsendingbuffer[i] == 0x0d )
                   {  
@@ -1298,11 +1189,7 @@ void loop() {
             // send these data to radio over CC1101
             ELECHOUSE_cc1101.SendData((char *)ccsendingbuffer);
 
-            // feed the watchdog
-            esp_task_wdt_reset();
-
-    
-                           
+                
        }
     // handling CLI commands processing
     else
@@ -1312,9 +1199,6 @@ void loop() {
             if (length) {
                 length--;
                 if (do_echo) Serial.write("\b \b");
-              // feed the watchdog
-              esp_task_wdt_reset();
-
             }
         }
         else if (data == '\r' || data == '\n' ) {
@@ -1322,17 +1206,10 @@ void loop() {
             buffer[length] = '\0';
             if (length) exec(buffer);
             length = 0;
-            // feed the watchdog
-            esp_task_wdt_reset();
-
-
         }
         else if (length < BUF_LENGTH - 1) {
             buffer[length++] = data;
             if (do_echo) Serial.write(data);
-            // feed the watchdog
-            esp_task_wdt_reset();
-
         }
        };  
       // end of handling CLI processing
@@ -1348,10 +1225,6 @@ void loop() {
        //CRC Check. If "setCrc(false)" crc returns always OK!
        if (ELECHOUSE_cc1101.CheckCRC())
           { 
-            // feed the watchdog
-            esp_task_wdt_reset();
-
-
             //Get received Data and calculate length
             int len = ELECHOUSE_cc1101.ReceiveData(ccreceivingbuffer);
 
@@ -1362,11 +1235,6 @@ void loop() {
                 ccreceivingbuffer[len] = '\0';
                 //Print received in char format.
                 Serial.print((char *) ccreceivingbuffer);
-                // feed the watchdog
-                // esp_task_wdt_reset();
-
-     
-
                };  // end of handling Chat mode
 
             // Actions for RECEIVNG MODE
@@ -1385,10 +1253,6 @@ void loop() {
                    Serial.print((char *)textbuffer);
                    // set RX  mode again
                    ELECHOUSE_cc1101.SetRx();
-                   // feed the watchdog
-                   esp_task_wdt_reset();
-
-                      
                 };   // end of handling receiving mode 
 
             // Actions for RECORDING MODE               
@@ -1396,8 +1260,7 @@ void loop() {
                { 
                 // copy the frame from receiving buffer for replay - only if it fits
                 if (( bigrecordingbufferpos + len + 1) < RECORDINGBUFFERSIZE) 
-                     {
-                      // put info about number of bytes
+                     { // put info about number of bytes
                       bigrecordingbuffer[bigrecordingbufferpos] = len; 
                       bigrecordingbufferpos++;
                       // next - copy current frame and increase 
@@ -1408,10 +1271,6 @@ void loop() {
                       framesinbigrecordingbuffer++;
                       // set RX  mode again
                       ELECHOUSE_cc1101.SetRx();
-                      // feed the watchdog
-                      esp_task_wdt_reset();
-
-                         
                      }
                      
                 else {
@@ -1420,10 +1279,6 @@ void loop() {
                     Serial.print(F("\r\n"));
                     bigrecordingbufferpos = 0;
                     recordingmode = 0;
-                    // feed the watchdog
-                    esp_task_wdt_reset();
-
-                       
                      };
                 
                };   // end of handling frame recording mode 
@@ -1438,23 +1293,10 @@ void loop() {
       { 
         // populate cc1101 sending buffer with random values
         randomSeed(analogRead(0));
-        
         for (i = 0; i<60; i++)
-           { ccsendingbuffer[i] = (byte)random(255); 
-             // feed the watchdog
-             esp_task_wdt_reset();
-              
-           };        
+           { ccsendingbuffer[i] = (byte)random(255);  };        
         // send these data to radio over CC1101
         ELECHOUSE_cc1101.SendData(ccsendingbuffer,60);
-        // feed the watchdog
-        esp_task_wdt_reset();
-
-             
       };
-
-   // give control for other procedures in ESP32
-   yield(); 
- 
  
 }  // end of main LOOP
