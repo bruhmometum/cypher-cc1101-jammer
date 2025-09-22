@@ -15,7 +15,7 @@
 
 #define CCBUFFERSIZE 64
 #define RECORDINGBUFFERSIZE 4096   // Buffer for recording the frames
-#define EPROMSIZE 4096              // Size of EEPROM in your Arduino chip. For  ESP32 size is 4096
+#define EPROMSIZE 4096              // Size of EEPROM in your Arduino chip. For  ESP32 size is 512
 #define BUF_LENGTH 128             // Buffer for the incoming command.
 
 // defining PINs set for ESP32-WROOM module
